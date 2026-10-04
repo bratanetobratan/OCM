@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расписание команды</title>
+    <style>
+        :root {
+            --bg: #FAFAFA;
+            --text-main: #111827;
+            --text-muted: #6B7280;
+            --blue-light: rgba(59, 130, 246, 0.15);
+            --blue-text: #2563EB;
+            --green-light: rgba(16, 185, 129, 0.15);
+            --green-text: #059669;
+            --orange-light: rgba(245, 158, 11, 0.15);
+            --orange-text: #D97706;
+        }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background: var(--bg); margin: 0; padding: 40px; color: var(--text-main); 
+        }
+        .calendar-container { max-width: 1200px; margin: 0 auto; }
+        
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+        .month-nav { display: flex; align-items: center; gap: 16px; }
+        .month-nav h2 { margin: 0; font-size: 24px; font-weight: 600; min-width: 200px; text-align: center; }
+        .nav-btn {
+            background: transparent; border: 1px solid #E5E7EB; border-radius: 8px;
+            width: 40px; height: 40px; cursor: pointer; display: flex;
+            align-items: center; justify-content: center; font-size: 18px;
+            color: var(--text-muted); transition: all 0.2s;
+        }
+        .nav-btn:hover { background: #FFFFFF; color: var(--text-main); border-color: #D1D5DB; }
+        
+        .weekdays { 
+            display: grid; grid-template-columns: repeat(7, 1fr); gap: 16px; 
+            margin-bottom: 16px; font-weight: 500; color: var(--text-muted); 
+            font-size: 14px; padding-left: 8px;
+        }
+        .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 16px; grid-auto-rows: minmax(120px, auto); }
+        
+        .day { 
+            padding: 12px; border-radius: 12px; cursor: pointer; 
+            transition: all 0.2s ease; border: 1px solid transparent;
+            display: flex; flex-direction: column; gap: 6px;
+            height: 100%; box-sizing: border-box;
+        }
+        .day:not(.empty):hover { background: #FFFFFF; box-shadow: 0 4px 20px rgba(0,0,0,0.04); }
+        .day.empty { pointer-events: none; opacity: 0.3; } 
+        
+        .date { font-size: 14px; font-weight: 500; color: var(--text-muted); margin-bottom: 4px; }
+        .day.today .date { background: var(--text-main); color: white; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 50%; margin-top: -4px; margin-left: -4px;}
+        
+        /* Карточки событий в сетке (с ограничением в 2 строки) */
+        .event { 
+            padding: 8px 10px; 
+            border-radius: 6px; 
+            text-align: left;
+            line-height: 1.4;
+            
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            word-wrap: break-word;
+        }
+        
+        .event.training { background: var(--blue-light); color: var(--blue-text); }
+        .event.match { background: var(--green-light); color: var(--green-text); }
+        .event.meeting { background: var(--orange-light); color: var(--orange-text); }
+
+        .event-time { 
+            font-size: 12px;
+            font-weight: 800;
+            margin-right: 4px; 
+        } 
+        .event-title { 
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        .btn { background: var(--text-main); color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 14px; }
+        .btn:hover { background: #374151; }
+        
+        /* Шторка (Drawer) */
+        .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.1); backdrop-filter: blur(2px); opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+        .drawer-overlay.active { opacity: 1; pointer-events: all; }
+        .drawer { position: fixed; right: -400px; top: 0; bottom: 0; width: 400px; background: white; box-shadow: -4px 0 24px rgba(0,0,0,0.06); transition: right 0.3s ease; padding: 32px 24px; box-sizing: border-box; overflow-y: auto; }
+        .drawer.active { right: 0; }
+        
+        .drawer-header { font-size: 20px; margin: 0 0 24px 0; font-weight: 600; }
+        .section-title { font-size: 14px; font-weight: 600; color: var(--text-muted); margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .drawer-events-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+        
+        /* Отменяем обрезку текста для событий внутри шторки */
+        .drawer-events-list .event {
+            display: block; 
+            -webkit-line-clamp: unset;
+            overflow: visible;
+        }
+
+        .drawer-divider { height: 1px; background: #E5E7EB; margin: 24px 0; }
+        
+        .input-group { margin-bottom: 20px; }
+        .input-row { display: flex; gap: 12px; }
+        .input-row .input-group { flex: 1; margin-bottom: 0; }
+        
+        .input-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; }
+        .input-group input, .input-group select { width: 100%; padding: 12px; border: 1px solid #E5E7EB; border-radius: 8px; box-sizing: border-box; font-size: 14px; outline: none; font-family: inherit; }
+        .input-group input:focus, .input-group select:focus { border-color: #3B82F6; }
+    </style>
+</head>
+<body>
+    <div class="calendar-container">
+        <div class="header">
+            <div class="month-nav">
+                <button class="nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+                <h2 id="month-year-display">Месяц Год</h2>
+                <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
+            </div>
+            <button class="btn" onclick="openDrawer()">+ Добавить</button>
+        </div>
+        
+        <div class="weekdays">
+            <div>Пн</div><div>Вт</div><div>Ср</div><div>Чт</div><div>Пт</div><div>Сб</div><div>Вс</div>
+        </div>
+        
+        <div class="grid" id="calendar-grid"></div>
+    </div>
+
+    <div class="drawer-overlay" id="overlay" onclick="closeDrawer()"></div>
+    <div class="drawer" id="drawer">
+        <h3 class="drawer-header" id="drawer-title">Новое событие</h3>
+        
+        <div class="input-row" style="margin-bottom: 20px;">
+            <div class="input-group">
+                <label>Дата</label>
+                <input type="text" id="event-date" value="" readonly>
+            </div>
+            <div class="input-group">
+                <label>Время</label>
+                <input type="time" id="event-time" value="18:00">
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Название события</label>
+            <input type="text" placeholder="Например: Тактический разбор">
+        </div>
+        
+        <div class="input-group">
+            <label>Тип</label>
+            <select id="event-type">
+                <option value="training">Тренировка</option>
+                <option value="match">Матч</option>
+                <option value="meeting">Общее собрание</option>
+            </select>
+        </div>
+
+        <button class="btn" style="width: 100%; margin-top: 4px;" onclick="closeDrawer()">Сохранить</button>
+
+        <div id="drawer-events-section" style="display: none;">
+            <div class="drawer-divider"></div>
+            <h4 class="section-title">Уже запланировано</h4>
+            <div class="drawer-events-list" id="drawer-events-list">
+                <!-- События будут сгенерированы через JS -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+        let currentDate = new Date();
+
+        const mockEvents = {
+            "2026-9-15": [
+                { time: "18:00", title: "Командная тренировка", type: "training" },
+                { time: "20:00", title: "Это очень длинное название события, которое точно не поместится в две строчки и должно быть аккуратно обрезано с помощью троеточия в конце второй строки в календаре, но полностью отображаться в шторке.", type: "meeting" } 
+            ],
+            "2026-9-17": [{ time: "19:00", title: "Выездной матч", type: "match" }],
+            "2026-10-5": [{ time: "10:00", title: "Сбор команды", type: "training" }]
+        };
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const today = new Date();
+
+            document.getElementById('month-year-display').innerText = `${monthNames[month]} ${year}`;
+            const grid = document.getElementById('calendar-grid');
+            grid.innerHTML = '';
+
+            let firstDay = new Date(year, month, 1).getDay();
+            firstDay = firstDay === 0 ? 6 : firstDay - 1; 
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            for (let i = 0; i < firstDay; i++) {
+                grid.innerHTML += `<div class="day empty"></div>`;
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateKey = `${year}-${month}-${day}`;
+                const events = mockEvents[dateKey] || [];
+                
+                let eventsHtml = events.map(ev => {
+                    return `
+                        <div class="event ${ev.type}">
+                            <span class="event-time">${ev.time}</span><span class="event-title">${ev.title}</span>
+                        </div>
+                    `;
+                }).join('');
+
+                const isToday = (day === today.getDate() && month === today.getMonth() && year === today.getFullYear());
+
+                grid.innerHTML += `
+                    <div class="day ${isToday ? 'today' : ''}" onclick="openDrawer(${year}, ${month}, ${day})">
+                        <div class="date">${day}</div>
+                        ${eventsHtml}
+                    </div>
+                `;
+            }
+        }
+
+        function changeMonth(offset) {
+            currentDate.setMonth(currentDate.getMonth() + offset);
+            renderCalendar();
+        }
+
+        function openDrawer(year, month, day) {
+            const dateInput = document.getElementById('event-date');
+            const eventsSection = document.getElementById('drawer-events-section');
+            const eventsListContainer = document.getElementById('drawer-events-list');
+            const drawerTitle = document.getElementById('drawer-title');
+
+            if (year !== undefined && month !== undefined && day !== undefined) {
+                const dateStr = `${day} ${monthNames[month]} ${year}`;
+                const dateKey = `${year}-${month}-${day}`;
+                
+                dateInput.value = dateStr;
+                drawerTitle.innerText = dateStr; 
+                
+                const events = mockEvents[dateKey] || [];
+                
+                if (events.length > 0) {
+                    eventsListContainer.innerHTML = events.map(ev => {
+                        return `
+                            <div class="event ${ev.type}">
+                                <span class="event-time">${ev.time}</span><span class="event-title">${ev.title}</span>
+                            </div>
+                        `;
+                    }).join('');
+                    eventsSection.style.display = 'block'; 
+                } else {
+                    eventsSection.style.display = 'none'; 
+                }
+            } else {
+                dateInput.value = 'Выберите дату';
+                drawerTitle.innerText = 'Новое событие';
+                eventsSection.style.display = 'none';
+            }
+
+            document.getElementById('drawer').classList.add('active');
+            document.getElementById('overlay').classList.add('active');
+        }
+
+        function closeDrawer() {
+            document.getElementById('drawer').classList.remove('active');
+            document.getElementById('overlay').classList.remove('active');
+        }
+
+        renderCalendar();
+    </script>
+</body>
+</html>
