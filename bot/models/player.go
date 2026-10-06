@@ -2,7 +2,7 @@ package models
 
 type Player struct {
 	FirstName   string
-	SecondName  string
+	LastName    string
 	Patronymic  string
 	ID          int64
 	PhoneNumber string
