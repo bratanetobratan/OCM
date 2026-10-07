@@ -27,7 +27,7 @@ func (s *Storage) Save(p *models.Player) (int64, error) {
 			phone_number,
 			email,
 			team_ids
-			) VALUES (пше 
+			) VALUES ( 
 			$1, $2, $3, $4, $5, $6 
 			)
 			RETURNING id
@@ -50,4 +50,46 @@ func (s *Storage) Save(p *models.Player) (int64, error) {
 	}
 
 	return id, nil
+}
+
+func (s *Storage) IsPhoneExist(phoneNumber string) (bool, error) {
+	query := `SELECT EXISTS(
+				SELECT 1
+				FROM players
+				WHERE phone_number = $1			
+			)`
+
+	var exists bool
+
+	err := s.db.QueryRow(
+		query,
+		phoneNumber,
+	).Scan(&exists)
+
+	if err != nil {
+		return false, e.Wrap("failed to check phone existence", err)
+	}
+
+	return exists, nil
+}
+
+func (s *Storage) IsEmailExist(email string) (bool, error) {
+	query := `SELECT EXISTS(
+				SELECT 1
+				FROM players
+				WHERE email = $1
+			)`
+
+	var exists bool
+
+	err := s.db.QueryRow(
+		query,
+		email,
+	).Scan(&exists)
+
+	if err != nil {
+		return false, e.Wrap("failed to check email existence", err)
+	}
+
+	return exists, nil
 }
