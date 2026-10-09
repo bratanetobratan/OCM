@@ -7,5 +7,4 @@ type Player struct {
 	ID          int64
 	PhoneNumber string
 	Email       string
-	TeamIDs     []int64
 }

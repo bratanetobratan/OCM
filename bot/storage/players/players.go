@@ -29,14 +29,13 @@ func (s *Storage) Save(p *models.Player, platform models.Platform, externalID st
 
 	query := `
 			INSERT INTO players (
-			first_name, 
-			last_name, 
-			patronymic, 
-			phone_number,
-			email,
-			team_ids
+				first_name, 
+				last_name, 
+				patronymic, 
+				phone_number,
+				email
 			) VALUES ( 
-			$1, $2, $3, $4, $5, $6
+				$1, $2, $3, $4, $5
 			)
 			RETURNING id
 	`
@@ -48,7 +47,6 @@ func (s *Storage) Save(p *models.Player, platform models.Platform, externalID st
 		p.Patronymic,
 		p.PhoneNumber,
 		p.Email,
-		p.TeamIDs,
 	).Scan(&ID)
 
 	if err != nil {
@@ -57,11 +55,11 @@ func (s *Storage) Save(p *models.Player, platform models.Platform, externalID st
 
 	query = `
 			INSERT INTO player_messengers (
-			player_id,
-			platform,
-			external_id
+				player_id,
+				platform,
+				external_id
 			) VALUES (
-			$1, $2, $3 
+				$1, $2, $3 
 			)
 	`
 
@@ -104,9 +102,8 @@ func (s *Storage) Update(p *models.Player) error {
 				last_name = $2,
 				patronymic = $3,
 				phone_number = $4,
-				email = $5,
-				team_ids = $6
-			WHERE id = $7
+				email = $5
+			WHERE id = $6
 	`
 
 	_, err := s.db.Exec(
@@ -116,7 +113,6 @@ func (s *Storage) Update(p *models.Player) error {
 		p.Patronymic,
 		p.PhoneNumber,
 		p.Email,
-		p.TeamIDs,
 		p.ID,
 	)
 
@@ -130,17 +126,40 @@ func (s *Storage) Update(p *models.Player) error {
 func (s *Storage) Find(platform models.Platform, externalID string) (*models.Player, error) {
 	query := `
 			SELECT 
-            p.id, 
-            p.first_name, 
-            p.last_name, 
-            COALESCE(p.patronymic, ''), 
-            p.phone_number, 
-            p.email, 
-            p.team_ids
-        FROM players p
-        JOIN player_messengers pm ON p.id = pm.player_id
-        WHERE pm.platform = $1 AND pm.external_id = $2
+            	p.id, 
+            	p.first_name, 
+            	p.last_name, 
+            	COALESCE(p.patronymic, ''), 
+            	p.phone_number, 
+            	p.email
+        	FROM players p
+        	JOIN player_messengers pm ON p.id = pm.player_id
+        	WHERE pm.platform = $1 AND pm.external_id = $2
 	`
+
+	var p models.Player
+
+	err := s.db.QueryRow(
+		query,
+		string(platform),
+		externalID,
+	).Scan(
+		&p.ID,
+		&p.FirstName,
+		&p.LastName,
+		&p.Patronymic,
+		&p.PhoneNumber,
+		&p.Email,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, e.Wrap("can't find player", err)
+	}
+
+	return &p, nil
 }
 
 func (s *Storage) IsPhoneExist(phoneNumber string) (bool, error) {
