@@ -5,6 +5,7 @@ import (
 	"OCM/bot/events"
 	"OCM/bot/lib/e"
 	"OCM/bot/storage"
+	"errors"
 )
 
 type Processor struct {
@@ -18,7 +19,10 @@ type Meta struct {
 	Username string
 }
 
-var errUnknownEventType = errors.New("unknown event type")
+var (
+	ErrUnknownEventType = errors.New("unknown event type")
+	ErrUnknownMetaType  = errors.New("unknown meta type")
+)
 
 func New(client *telegram.Client, storage storage.Storage) *Processor {
 	return &Processor{
@@ -27,7 +31,7 @@ func New(client *telegram.Client, storage storage.Storage) *Processor {
 	}
 }
 
-func (p *Processor) Fetch(limit int) ([]events.Event ,error) {
+func (p *Processor) Fetch(limit int) ([]events.Event, error) {
 	updates, err := p.tg.Updates(p.offset, limit)
 	if err != nil {
 		return nil, e.Wrap("can't get events", err)
@@ -52,13 +56,26 @@ func (p *Processor) Process(event events.Event) error {
 	switch event.Type {
 	case events.Message:
 		p.processMessage(event)
-	case default:
-
+	default:
+		return e.Wrap("can't process message", ErrUnknownEventType)
 	}
 }
 
-func (p *Processor) processMessage(event events.Event) {
-	
+func (p *Processor) processMessage(event events.Event) error {
+	meta, err := meta(event)
+	if err != nil {
+		return e.Wrap("can't process message", err)
+	}
+
+}
+
+func meta(event events.Event) (Meta, error) {
+	res, ok := event.Meta.(Meta)
+	if !ok {
+		return Meta{}, e.Wrap("can't get meta", ErrUnknownMetaType)
+	}
+
+	return res, nil
 }
 
 func event(upd telegram.Update) events.Event {
@@ -71,12 +88,12 @@ func event(upd telegram.Update) events.Event {
 
 	if updType == events.Message {
 		res.Meta = Meta{
-			ChatID: upd.Message.Chat.ID,
+			ChatID:   upd.Message.Chat.ID,
 			Username: upd.Message.From.Username,
 		}
 	}
 
-	return res 
+	return res
 }
 
 func fetchText(upd telegram.Update) string {
